@@ -1,0 +1,112 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: go-postgres
+    networks:
+      - ecommerce-network
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: "${DB_USER}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB: "${DB_NAME}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d ${DB_NAME} -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: go-redis
+    networks:
+      - ecommerce-network
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: go-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: "${RABBITMQ_USER}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD}"
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  ecommerce-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: go-ecommerce-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+
+  consumer-check-expired-payment:
+    build:
+      context: .
+      dockerfile: Dockerfile.consumer-check-expired-payment
+    container_name: consumer-check-expired-payment
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+    env_file:
+      - .env
+
+  consumer-update-status-order:
+    build:
+      context: .
+      dockerfile: Dockerfile.consumer-update-status-order
+    container_name: consumer-update-status-order
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+    env_file:
+      - .env
+
+networks:
+  ecommerce-network:
+    driver: bridge
+
+volumes:
+  postgres:
+    driver: local
+  redis:
+    driver: local
+  rabbitmq:
+    driver: local

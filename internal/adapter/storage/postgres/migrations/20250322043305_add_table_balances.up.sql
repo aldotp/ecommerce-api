@@ -1,0 +1,8 @@
+CREATE TABLE balances (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL UNIQUE,
+    balance DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
